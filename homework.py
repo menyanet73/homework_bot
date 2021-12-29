@@ -41,26 +41,35 @@ HOMEWORK_STATUSES = {
 
 
 def send_message(bot, message):
-    bot.send_message(TELEGRAM_CHAT_ID, message)
-
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logger.info(f'Сообщение удачно отправлено: {message}')
+    except Exception:
+        logger.error(f'Сбой при отправке сообщения')
 
 def get_api_answer(current_timestamp):
     timestamp = current_timestamp or int(time.time())
+    timestamp = 0
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+        if response.status_code != 200:
+            logger.error('Статус код ответа отличается от 200')
+            raise exceptions.StatusCodeError()
         return response.json()
     except Exception:
         logger.error('')
         #исключения: недоступность эндпоинта, другие сбои - еррор
 
 def check_response(response):
-    if 'homeworks' in response and 'current_date' in response:
-        homeworks = response['homeworks']
+    try:
+        homeworks = response.get('homeworks')
+        if not homeworks:
+            logger.info('Отсутствуют домашние задания в ответе API')
+            raise exceptions.EmptyHomeworks()
         return homeworks
-    else:
-        # logging.error
-        pass
+    except Exception:
+        logger.error('Отсутствует ключ "homeworks" в ответе API')
 
 
 def parse_status(homework):
@@ -69,15 +78,22 @@ def parse_status(homework):
         homework_status = homework['status']
         verdict = HOMEWORK_STATUSES[homework_status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-    except:
-        pass
-
+    except Exception:
+        logger.error('Не документированный статус домашней работы в ответе')
+        # отсутствие в ответе новых статусов
 
 def check_tokens():
-    if PRACTICUM_TOKEN and TELEGRAM_CHAT_ID and TELEGRAM_TOKEN:
-        return True
-    else:
+    if PRACTICUM_TOKEN == None:
+        logger.error('Отсутствует PRACTICUM_TOKEN')
         return False
+    elif TELEGRAM_CHAT_ID == None:
+        logger.error('Отсутствует TELEGRAM_CHAT_ID')
+        return False
+    elif TELEGRAM_TOKEN == None:
+        logger.error('Отсутствует TELEGRAM_TOKEN')
+        return False
+    else:
+        return True
 
 
 def main():
@@ -90,26 +106,29 @@ def main():
 
     ...
 
-    while True:
-        try:
-            response = get_api_answer(current_timestamp)
-            homeworks = check_response(response)
-            if len(homeworks) > 0:
-                message = parse_status(homeworks[0])
+    if check_tokens() is True:
+        while True:
+            try:
+                response = get_api_answer(current_timestamp)
+                homeworks = check_response(response)
+                if type(homeworks) != list:
+                    for homework in homeworks:
+                        message = parse_status(homework)
+                        send_message(bot, message)
+
+
+                ...
+
+                current_timestamp = response.get('current_date')
+                time.sleep(RETRY_TIME)
+
+            except Exception as error:
+                message = f'Сбой в работе программы: {error}'
+                logger.error(message)
                 send_message(bot, message)
-
-
-            ...
-
-            current_timestamp = ...
-            time.sleep(RETRY_TIME)
-
-        except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            ...
-            time.sleep(RETRY_TIME)
-        else:
-            ...
+                time.sleep(RETRY_TIME)
+            else:
+                logger.error('Не удается отправить сообщение в телеграм')
 
 
 if __name__ == '__main__':
