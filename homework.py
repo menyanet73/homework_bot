@@ -53,10 +53,11 @@ def get_api_answer(current_timestamp):
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    if response.status_code == 404:
+        raise exceptions.Endpoint404
     if response.status_code != 200:
         raise exceptions.StatusCodeError
     return response.json()
-        #исключения: недоступность эндпоинта, другие сбои - еррор
 
 
 def check_response(response):
@@ -66,7 +67,7 @@ def check_response(response):
         raise TypeError()
     homeworks = response.get('homeworks')
     if not homeworks:
-        logger.error('Нет домашек в ответе')
+        logger.error('Нет новых домашек в ответе')
         raise exceptions.EmptyHomeworks()
     if type(homeworks) is not list:
         logger.error('Домашки в ответе, не в списке')
@@ -79,6 +80,8 @@ def parse_status(homework):
     """Функция получения статуса домашней работы."""
     homework_name = homework['homework_name']
     homework_status = homework['status']
+    if homework_status not in HOMEWORK_STATUSES:
+        raise exceptions.NotDocHomeworkStatus()
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -105,11 +108,11 @@ def main():
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
+    # current_timestamp = 1636121267
     if check_tokens() is True:
         while True:
             try:
                 response = get_api_answer(current_timestamp)
-                logger.error('Ошибка ответа от API')
                 homeworks = check_response(response)
                 for homework in homeworks:
                     message = parse_status(homework)
@@ -117,14 +120,20 @@ def main():
                     logger.info('Сообщение успешно отправлено')
                 current_timestamp = response.get('current_date')
                 time.sleep(RETRY_TIME)
+            except exceptions.EmptyHomeworks as error:
+                message = f'Сбой в работе программы: {error}'
+                logger.error(message)
+                time.sleep(RETRY_TIME)
+            except KeyError:
+                message = f'Сбой в работе программы: Отсутствуют ожидаемые'
+                +f'ключи в ответе API'
+                logger.error(message)
+                send_message(bot, message)
+                time.sleep(RETRY_TIME)
             except Exception as error:
                 message = f'Сбой в работе программы: {error}'
                 logger.error(message)
-                try:
-                    send_message(bot, message)
-                    logger.info('Сообщение успешно отправлено')
-                except:    
-                    logger.error('Не удается отправить сообщение в телеграм')
+                send_message(bot, message)
                 time.sleep(RETRY_TIME)
 
 
