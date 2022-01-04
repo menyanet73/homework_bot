@@ -9,3 +9,7 @@ class EmptyHomeworks(Exception):
 class StatusCodeError(Exception):
     def __str__(self):
         return f'Статус код ответа отличается от 200'
+
+class EmptyAPIResponse(Exception):
+    def __str__(self):
+        return f'Пустой ответ API'
