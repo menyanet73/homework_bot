@@ -1,7 +1,8 @@
 import logging
 import os
+import sys
 import time
-from logging.handlers import RotatingFileHandler
+#from logging.handlers import RotatingFileHandler
 
 import requests
 import telegram
@@ -13,11 +14,13 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-handler = RotatingFileHandler(
+"""handler = RotatingFileHandler(
     'homework_logger.log',
     maxBytes=5000000,
     backupCount=3
-)
+)"""
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
 handler.setFormatter(logging.Formatter(
     '%(asctime)s [%(levelname)s] %(message)s'
 ))
@@ -110,7 +113,7 @@ def main():
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    # current_timestamp = 1636121267
+    current_timestamp = 1636121267
     if check_tokens() is True:
         while True:
             try:
