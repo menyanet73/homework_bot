@@ -41,15 +41,16 @@ HOMEWORK_STATUSES = {
 
 
 def send_message(bot, message):
+    """Функция отправки сообщения в телеграм."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info(f'Сообщение удачно отправлено: {message}')
     except Exception:
-        logger.error(f'Сбой при отправке сообщения')
+        logger.error(f'Сбой при отправке сообщения: {message}')
 
 
 def get_api_answer(current_timestamp):
-    """Обращение к API практикума, и передача json ответа"""
+    """Обращение к API практикума, и передача json ответа."""
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     response = requests.get(ENDPOINT, headers=HEADERS, params=params)
@@ -61,19 +62,17 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    """Функция изъятия домашек из ответа API"""
+    """Функция изъятия домашек из ответа API."""
     if type(response) is not dict:
         logger.error('Некорректный тип. Ответ - не словарь.')
         raise TypeError()
     homeworks = response.get('homeworks')
     if not homeworks:
-        logger.error('Нет новых домашек в ответе')
         raise exceptions.EmptyHomeworks()
     if type(homeworks) is not list:
         logger.error('Домашки в ответе, не в списке')
         raise TypeError()
     return homeworks
-
 
 
 def parse_status(homework):
@@ -88,17 +87,20 @@ def parse_status(homework):
 
 def check_tokens():
     """Функция проверки наличия токенов в окружении."""
-    if PRACTICUM_TOKEN == None:
-        logger.error('Не обнаружена обязательная переменная окружения:' 
-        'PRACTICUM_TOKEN')
+    if PRACTICUM_TOKEN is None:
+        logger.error(
+            'Не обнаружена обязательная переменная окружения:PRACTICUM_TOKEN'
+        )
         return False
-    elif TELEGRAM_CHAT_ID == None:
-        logger.error('Не обнаружена обязательная переменная окружения:' 
-        'TELEGRAM_CHAT_ID')
+    elif TELEGRAM_CHAT_ID is None:
+        logger.error(
+            'Не обнаружена обязательная переменная окружения:TELEGRAM_CHAT_ID'
+        )
         return False
-    elif TELEGRAM_TOKEN == None:
-        logger.error('Не обнаружена обязательная переменная окружения:' 
-        'TELEGRAM_TOKEN')
+    elif TELEGRAM_TOKEN is None:
+        logger.error(
+            'Не обнаружена обязательная переменная окружения:TELEGRAM_TOKEN'
+        )
         return False
     else:
         return True
@@ -121,12 +123,11 @@ def main():
                 current_timestamp = response.get('current_date')
                 time.sleep(RETRY_TIME)
             except exceptions.EmptyHomeworks as error:
-                message = f'Сбой в работе программы: {error}'
-                logger.error(message)
+                logger.debug(error)
                 time.sleep(RETRY_TIME)
             except KeyError:
-                message = f'Сбой в работе программы: Отсутствуют ожидаемые'
-                +f'ключи в ответе API'
+                message = 'Сбой в работе программы: Отсутствуют ожидаемые'
+                +'ключи в ответе API'
                 logger.error(message)
                 send_message(bot, message)
                 time.sleep(RETRY_TIME)
