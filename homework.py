@@ -1,9 +1,11 @@
 import logging
 import os
 import time
+from http import HTTPStatus
 from logging.handlers import RotatingFileHandler
 
 import requests
+from simplejson.errors import JSONDecodeError
 import telegram
 from dotenv import load_dotenv
 
@@ -45,8 +47,10 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info(f'Сообщение удачно отправлено: {message}')
-    except Exception:
-        logger.error(f'Сбой при отправке сообщения: {message}')
+    except telegram.TelegramError as error:
+        logger.error(f'Сбой при отправке сообщения: telegram_error: {error}')
+    except Exception as error:
+        logger.error(f'Сбой при отправке сообщения: {error}')
 
 
 def get_api_answer(current_timestamp):
@@ -54,33 +58,41 @@ def get_api_answer(current_timestamp):
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    if response.status_code == 404:
+    if response.status_code == HTTPStatus.NOT_FOUND:
         raise exceptions.Endpoint404
-    if response.status_code != 200:
+    if response.status_code != HTTPStatus.OK:
         raise exceptions.StatusCodeError
     return response.json()
+
+
 
 
 def check_response(response):
     """Функция изъятия домашек из ответа API."""
     if type(response) is not dict:
         logger.error('Некорректный тип. Ответ - не словарь.')
-        raise TypeError()
+        raise TypeError('Некорректный тип. Ответ - не словарь.')
     homeworks = response.get('homeworks')
     if not homeworks:
-        raise exceptions.EmptyHomeworks()
+        raise exceptions.EmptyHomeworks('Нет новых домашек в ответе')
     if type(homeworks) is not list:
         logger.error('Домашки в ответе, не в списке')
-        raise TypeError()
+        raise TypeError('Домашки в ответе не в списке')
     return homeworks
 
 
 def parse_status(homework):
     """Функция получения статуса домашней работы."""
+    if 'homework_name' not in homework:
+        raise KeyError('Отсутствует ключ homework_name в домашках')
+    if 'status' not in homework:
+        raise KeyError('Отсутствует ключ status в домашках')
     homework_name = homework['homework_name']
     homework_status = homework['status']
     if homework_status not in HOMEWORK_STATUSES:
-        raise exceptions.NotDocHomeworkStatus()
+        raise exceptions.NotDocHomeworkStatus(
+            'Не документированный статус домашней работы'
+        )
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -110,7 +122,7 @@ def main():
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    if check_tokens() is True:
+    if check_tokens():
         while True:
             try:
                 response = get_api_answer(current_timestamp)
@@ -121,12 +133,22 @@ def main():
                     logger.info('Сообщение успешно отправлено')
                 current_timestamp = response.get('current_date')
                 time.sleep(RETRY_TIME)
+            except requests.exceptions.RequestException as error:
+                message = f'Ошибка запроса к серверу: {error}'
+                logger.error(message)
+                send_message(bot, message)
+                time.sleep(RETRY_TIME)
             except exceptions.EmptyHomeworks as error:
                 logger.debug(error)
                 time.sleep(RETRY_TIME)
             except KeyError:
                 message = 'Сбой в работе программы: Отсутствуют ожидаемые'
                 +'ключи в ответе API'
+                logger.error(message)
+                send_message(bot, message)
+                time.sleep(RETRY_TIME)
+            except JSONDecodeError as error:
+                message = f'Сбой в работе программы: {error}'
                 logger.error(message)
                 send_message(bot, message)
                 time.sleep(RETRY_TIME)
