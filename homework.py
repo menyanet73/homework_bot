@@ -5,7 +5,7 @@ from http import HTTPStatus
 from logging.handlers import RotatingFileHandler
 
 import requests
-from simplejson.errors import JSONDecodeError
+from json.decoder import JSONDecodeError
 import telegram
 from dotenv import load_dotenv
 
