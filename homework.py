@@ -65,8 +65,6 @@ def get_api_answer(current_timestamp):
     return response.json()
 
 
-
-
 def check_response(response):
     """Функция изъятия домашек из ответа API."""
     if type(response) is not dict:
