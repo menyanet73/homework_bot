@@ -1,2 +1,2 @@
 # homework_bot
-python telegram bot
+Telegram бот проверяющий обновления статуса домашней работы на API ЯНДЕКС.ПРАКТИКУМ.
