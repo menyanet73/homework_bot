@@ -2,6 +2,7 @@
 Telegram бот проверяющий обновления статуса домашней работы на API ЯНДЕКС.ПРАКТИКУМ.
 
 Стек: Python 3, python-telegram-bot
+#### Для работы бота необходимо указать: PRAKTIKUM_TOKEN, TELEGRAM_TOKEN и TELEGRAM_CHAT_ID в .dotenv
 ### How start project:
 
 Clone a repository and go to command line:
